@@ -1,0 +1,30 @@
+swagger: "2.0"
+basePath: "/"
+info:
+  title: Pdf Generator
+  description: Api's to generate pdf
+  version: '1.0'
+paths:
+  /generatepdf:
+    post:
+      tags:
+        - Pdf generator
+      description: convert html to pdf
+      produces:
+        - application/pdf
+      consumes:
+        - multipart/form-data
+      parameters:
+        - name: htmlTemplateFile
+          in: formData
+          type: file
+          required: true
+          description: Html template to be processed, handlebars suported
+        - name: jsonData
+          in: formData
+          type: file
+          required: true
+          description: Json data to be processed
+      responses:
+        200:
+          description: Successfully created
