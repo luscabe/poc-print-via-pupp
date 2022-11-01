@@ -1,3 +1,49 @@
+/**
+ *  @swagger
+ *  /generate-pdf:
+ *    post:
+ *        tags:
+ *          - Pdf generator
+ *        description: Convert html template (supports Handlebars) and json to pdf
+ *        produces:
+ *          - application/pdf
+ *        parameters:
+ *
+ *        requestBody:
+ *          content:
+ *            multipart/form-data:
+ *              schema:
+ *                type: object
+ *                required:
+ *                  - htmlTemplateFile
+ *                  - jsonData
+ *                properties:
+ *                  htmlTemplateFile:
+ *                    type: string
+ *                    format: binary
+ *                    required: true
+ *                    description: Html template to be processed, supports Handlebars templates
+ *                  jsonData:
+ *                    type: string
+ *                    format: binary
+ *                    required: true
+ *                    description: Json data to be processed
+ *                  puppeteerPDFGeneratorCustomOptions:
+ *                    type: object
+ *                    required: false
+ *                    description: A custom object with the format of puppeteer.PDFOptions used for the pdf generation instead of the default, overrides the 'curtomHeader' and 'customFooter'
+ *                  customHeader:
+ *                    type: string
+ *                    required: false
+ *                    description: A string of HTML used for the header instead of the default
+ *                  customFooter:
+ *                    type: string
+ *                    required: false
+ *                    description: A string of HTML used for the footer instead of the default
+ *        responses:
+ *          200:
+ *            description: Successfully created
+ */
 const express = require("express");
 const puppeteer = require("puppeteer");
 const handlebars = require("handlebars");
@@ -7,16 +53,57 @@ require("handlebars-helpers")();
 const uuid = require("uuid-random");
 const router = express.Router();
 
-router.post("/generatepdf", (req, res, next) => {
+router.post("/generate-pdf", (req, res, next) => {
   generatePdf(req, res);
+});
+router.post("/generate-pdf-from-url", (req, res, next) => {
+  generatePdfFromUrl(req, res);
 });
 async function startBrowser() {
   const browser = await puppeteer.launch({
-          args: ["--no-sandbox", "--disable-setuid-sandbox"],
-          headless: true,
-  })
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    headless: true,
+    // headless: false,
+  });
   const page = await browser.newPage();
-  return {browser,page}
+  return { browser, page };
+}
+async function generatePdfFromUrl(req, res) {
+  if (req.body.url && req.body.url.length > 0) {
+    try {
+      const { browser, page } = await startBrowser();
+      try {
+        await page.goto(req.body.url, { waitUntil: "networkidle0" });
+        await page.emulateMediaType("print");
+        const buffer = await page.pdf({
+          format: "A4",
+          width: "210mm",
+          height: "297mm",
+          margin: {
+            top: "15mm",
+            bottom: "20mm",
+            right: "8mm",
+            left: "8mm",
+          },
+          displayHeaderFooter: true,
+          printBackground: true,
+        });
+        browser.close().then(() => {
+          res
+            .set({
+              "Content-Type": "application/pdf",
+              "Content-Length": buffer.length,
+              "Content-Disposition": "attachment; filename=" + `${uuid()}.pdf`,
+            })
+            .send(buffer);
+        });
+      } catch (error) {
+        res.status(422).send(error);
+      }
+    } catch (error) {
+      res.status(422).send(error);
+    }
+  }
 }
 async function generatePdf(req, res) {
   try {
@@ -58,43 +145,49 @@ async function generatePdf(req, res) {
     let file = req.files.htmlTemplateFile.data.toString();
     let fileName = `${uuid()}.pdf`;
     const jsonData = JSON.parse(req.files.jsonData.data);
-    let options = {
-      width: "1230px",
-      displayHeaderFooter: true,
-      margin: {
-        top: "100px",
-        bottom: "50px",
-        right: "20px",
-        left: "20px",
-      },
-      printBackground: true,
-      format: "A4",
-      headerTemplate:
-        '<span style="font-size: 10px; width: 100%; height: 20px; background-color: black; color: white; margin: 20px;">I live in Dogwarts</span>',
-      footerTemplate:
-        '<div style="margin-left:15px; margin-right:15px; border-top: 1px solid rgb(166, 166, 166); display:flex; justify-content:space-between; font-size:10px; padding-right:20px; width:100%">' +
-        '<div style="padding-left:5px; padding-top:5px;">Pagina <span class="pageNumber"></span> de <span class="totalPages"></span></div>' +
-        `<div style="padding-top:5px;">${new Date().toISOString()}</div>` +
-        "</div>",
-    };
+    let options =
+      // req.body.puppeteerPDFGeneratorCustomOptions? req.body.puppeteerPDFGeneratorCustomOptions:
+      {
+        format: "A4",
+        width: "210mm",
+        height: "297mm",
+        margin: {
+          top: "15mm",
+          bottom: "20mm",
+          right: "8mm",
+          left: "8mm",
+        },
+        displayHeaderFooter: true,
+        printBackground: true,
+        headerTemplate: req.body.customHeader
+          ? req.body.customHeader
+          : '<span style="font-size: 10px; width: 100%; height: 20px; background-color: black; color: white; margin: 20px;">I live in Dogwarts</span>',
+        footerTemplate: req.body.customFooter
+          ? req.body.customFooter
+          : '<div style="margin-left:15px; margin-right:15px; border-top: 1px solid rgb(166, 166, 166); display:flex; justify-content:space-between; font-size:10px; padding-right:20px; width:100%">' +
+            '<div style="padding-left:5px; padding-top:5px;">Pagina <span class="pageNumber"></span> de <span class="totalPages"></span></div>' +
+            `<div style="padding-top:5px;">${new Date().toISOString()}</div>` +
+            "</div>",
+      };
     try {
       const template = handlebars.compile(file);
       const html = template(jsonData);
 
       const { browser, page } = await startBrowser();
       await page.setJavaScriptEnabled(false);
-      await page.setContent(html, { waitUntil: ["domcontentloaded", "load", "networkidle0"] });
-      await page.addStyleTag({ content: "@page:first {margin-top: 0;} @page{ margin-bottom: 50px}" });
+      await page.setContent(html, {
+        waitUntil: ["domcontentloaded", "load", "networkidle0"],
+      });
+      await page.addStyleTag({
+        content: "@page:first {margin-top: 0;} @page{ margin-bottom: 50px}",
+      });
       const buffer = await page.pdf(options);
-      browser
-        .close()
-        .then(() => {
+      browser.close().then(() => {
         res
           .set({
             "Content-Type": "application/pdf",
             "Content-Length": buffer.length,
-            "Content-Disposition":
-              "attachment; filename=" + fileName,
+            "Content-Disposition": "attachment; filename=" + fileName,
           })
           .send(buffer);
       });
