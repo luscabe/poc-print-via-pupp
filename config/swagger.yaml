@@ -25,21 +25,31 @@ paths:
           type: file
           required: true
           description: Json data to be processed
-      requestBody:
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              properties:
-                # puppeteerPDFGeneratorCustomOptions:
-                #   type: object
-                #   description: A custom object with the format of puppeteer.PDFOptions used for the pdf generation instead of the default, overrides the 'curtomHeader' and 'customFooter'
-                customHeader:
-                  type: string
-                  description: A string of HTML used for the header instead of the default
-                customFooter:
-                  type: string
-                  description: A string of HTML used for the footer instead of the default
+        - name: customHeader
+          in: formData
+          type: string
+          required: false
+          description: A string of HTML used for the header instead of the default
+        - name: customFooter
+          in: formData
+          type: string
+          required: false
+          description: A string of HTML used for the footer instead of the default
+      # requestBody:
+      #   content:
+      #     multipart/form-data:
+      #       schema:
+      #         type: object
+      #         properties:
+      #           puppeteerPDFGeneratorCustomOptions:
+      #             type: object
+      #             description: A custom object with the format of puppeteer.PDFOptions used for the pdf generation instead of the default, overrides the 'curtomHeader' and 'customFooter'
+      #           customHeader:
+      #             type: string
+      #             description: A string of HTML used for the header instead of the default
+      #           customFooter:
+      #             type: string
+      #             description: A string of HTML used for the footer instead of the default
       responses:
         200:
           description: Successfully created
