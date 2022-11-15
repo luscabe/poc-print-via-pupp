@@ -161,7 +161,7 @@ async function generatePdf(req, res) {
         printBackground: true,
         headerTemplate: req.body.customHeader
           ? req.body.customHeader
-          : '<span style="font-size: 10px; width: 100%; height: 20px; background-color: black; color: white; margin: 20px;">I live in Dogwarts</span>',
+          : '',
         footerTemplate: req.body.customFooter
           ? req.body.customFooter
           : '<div style="margin-left:15px; margin-right:15px; border-top: 1px solid rgb(166, 166, 166); display:flex; justify-content:space-between; font-size:10px; padding-right:20px; width:100%">' +
